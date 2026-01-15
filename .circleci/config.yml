@@ -1,0 +1,23 @@
+version: 2.1
+jobs:
+  build_and_push:
+    docker:
+      - image: cimg/node:22.0
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build and Push to Docker Hub
+          command: |
+            # Docker Hub login
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            # Image Build (mohsinkhan0786/todo-app ya apna username use karein)
+            docker build -t mohsin11argon/todo-app:latest .
+            # Image Push
+            docker push mohsin11argon/todo-app:latest
+
+workflows:
+  version: 2
+  build-master:
+    jobs:
+      - build_and_push
