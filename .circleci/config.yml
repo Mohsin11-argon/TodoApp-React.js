@@ -7,14 +7,14 @@ jobs:
       - checkout
       - setup_remote_docker
       - run:
-          name: Build and Push to Docker Hub
+          name: Build and Push Docker Image
           command: |
+            # Docker Hub login using variables you added
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             docker build -t moshindevops11/todo-app:latest .
             docker push moshindevops11/todo-app:latest
 
 workflows:
-  version: 2
   build-master:
     jobs:
       - build_and_push
