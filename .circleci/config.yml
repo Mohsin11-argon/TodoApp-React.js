@@ -7,12 +7,25 @@ jobs:
       - checkout
       - setup_remote_docker
       - run:
-          name: Build and Push Docker Image
+          name: Build and Push Docker Image with Retry
           command: |
-            # Docker Hub login using variables you added
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             docker build -t moshindevops11/todo-app:latest .
-            docker push moshindevops11/todo-app:latest
+            
+            # Retry logic: 
+            n=0
+            until [ "$n" -ge 3 ]
+            do
+               docker push moshindevops11/todo-app:latest && break
+               n=$((n+1)) 
+               echo "Push failed, retrying in 5 seconds... (Attempt $n)"
+               sleep 5
+            done
+            
+            if [ "$n" -ge 3 ]; then
+              echo "Push failed after 3 attempts."
+              exit 1
+            fi
 
 workflows:
   build-master:
