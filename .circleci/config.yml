@@ -10,8 +10,8 @@ jobs:
           name: Build and Push to Docker Hub
           command: |
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            docker build -t mohsin11argon/todo-app:latest .
-            docker push mohsin11argon/todo-app:latest
+            docker build -t moshindevops11/todo-app:latest .
+            docker push moshindevops11/todo-app:latest
 
 workflows:
   version: 2
