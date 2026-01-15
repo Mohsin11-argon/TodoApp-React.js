@@ -9,11 +9,8 @@ jobs:
       - run:
           name: Build and Push to Docker Hub
           command: |
-            # Docker Hub login
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-            # Image Build (mohsinkhan0786/todo-app ya apna username use karein)
             docker build -t mohsin11argon/todo-app:latest .
-            # Image Push
             docker push mohsin11argon/todo-app:latest
 
 workflows:
