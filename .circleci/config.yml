@@ -7,23 +7,38 @@ jobs:
       - checkout
       - setup_remote_docker
       - run:
-          name: Build and Push Docker Image with Retry
+          name: Build and Push with Rollback Logic
           command: |
+            # 1. Login to Docker Hub
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            
+            # 2. Tag existing image as 'backup' before pushing new one (Rollback Preparation)
+            docker pull moshindevops11/todo-app:latest && \
+            docker tag moshindevops11/todo-app:latest moshindevops11/todo-app:backup && \
+            docker push moshindevops11/todo-app:backup || echo "No previous image found, skipping backup."
+
+            # 3. Build new image
             docker build -t moshindevops11/todo-app:latest .
             
-            # Retry logic: 
+            # 4. Push with Retry and Rollback on Failure
             n=0
             until [ "$n" -ge 3 ]
             do
-               docker push moshindevops11/todo-app:latest && break
-               n=$((n+1)) 
-               echo "Push failed, retrying in 5 seconds... (Attempt $n)"
-               sleep 5
+               if docker push moshindevops11/todo-app:latest; then
+                  echo "Push successful!"
+                  break
+               else
+                  n=$((n+1)) 
+                  echo "Push failed, attempt $n of 3..."
+                  sleep 5
+               fi
             done
             
+            # 5. Rollback: Agar 3 attempts fail ho jayein, backup image ko latest bana do
             if [ "$n" -ge 3 ]; then
-              echo "Push failed after 3 attempts."
+              echo "Push failed after 3 attempts. Rolling back to previous version..."
+              docker tag moshindevops11/todo-app:backup moshindevops11/todo-app:latest
+              docker push moshindevops11/todo-app:latest
               exit 1
             fi
 
