@@ -5,44 +5,46 @@ jobs:
       - image: cimg/node:22.0
     steps:
       - checkout
-      - setup_remote_docker
+      - setup_remote_docker:
+          docker_layer_caching: false 
+      
+      # Step 1: Restore npm cache
+      - restore_cache:
+          keys:
+            - v1-deps-{{ checksum "package-lock.json" }}
+            - v1-deps-
+
+      # Step 2: Install (only if cache miss )
+      - run: npm install
+
+      # Step 3: Save npm cache
+      - save_cache:
+          key: v1-deps-{{ checksum "package-lock.json" }}
+          paths:
+            - node_modules
+
+      # Step 4: Docker Build with Cache-From (Memory & Time Saver)
       - run:
-          name: Build and Push with Rollback Logic
+          name: Optimized Docker Build
           command: |
-            # 1. Login to Docker Hub
             echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
             
-            # 2. Tag existing image as 'backup' before pushing new one (Rollback Preparation)
-            docker pull moshindevops11/todo-app:latest && \
-            docker tag moshindevops11/todo-app:latest moshindevops11/todo-app:backup && \
-            docker push moshindevops11/todo-app:backup || echo "No previous image found, skipping backup."
-
-            # 3. Build new image
-            docker build -t moshindevops11/todo-app:latest .
+            # Purani image pull karo cache ke liye (agar exist karti ho)
+            docker pull moshindevops11/todo-app:latest || true
             
-            # 4. Push with Retry and Rollback on Failure
+            # Build using pulled image as cache
+            docker build \
+              --cache-from=moshindevops11/todo-app:latest \
+              -t moshindevops11/todo-app:latest .
+
+      # Step 5: Push with Retry 
+      - run:
+          name: Push with Retry
+          command: |
             n=0
-            until [ "$n" -ge 3 ]
-            do
-               if docker push moshindevops11/todo-app:latest; then
-                  echo "Push successful!"
-                  break
-               else
-                  n=$((n+1)) 
-                  echo "Push failed, attempt $n of 3..."
-                  sleep 5
-               fi
+            until [ "$n" -ge 3 ]; do
+               docker push moshindevops11/todo-app:latest && break
+               n=$((n+1))
+               sleep 5
             done
-            
-            # 5. Rollback: Agar 3 attempts fail ho jayein, backup image ko latest bana do
-            if [ "$n" -ge 3 ]; then
-              echo "Push failed after 3 attempts. Rolling back to previous version..."
-              docker tag moshindevops11/todo-app:backup moshindevops11/todo-app:latest
-              docker push moshindevops11/todo-app:latest
-              exit 1
-            fi
-
-workflows:
-  build-master:
-    jobs:
-      - build_and_push
+            if [ "$n" -ge 3 ]; then exit 1; fi
