@@ -1,0 +1,14 @@
+name: Branch-Test-Pipeline
+on:
+  push:
+    branches: [ "feature/test-pipeline" ]
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Branch Test
+        run: |
+          echo "Testing pipeline on feature/test-pipeline branch"
+          echo "Branch specific workflow triggered successfully"
