@@ -1,137 +1,55 @@
-# name: CI/CD Pipeline
-
-# on:
-#   push:
-#     branches: [ main ]
-
-# jobs:
-#   build-and-test:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout Code
-#         uses: actions/checkout@v4
-
-#       - name: Set up Node.js
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: '22'
-#           cache: 'npm'
-
-#       - name: Install Dependencies
-#         run: npm install
-
-#       - name: Build Project
-#         run: npm run build 
-#       - name: Run Tests
-#         run: npm test 
-
-#   deploy:
-#     needs: build-and-test 
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout Code
-#         uses: actions/checkout@v4
-
-#       - name: Login to Docker Hub
-#         uses: docker/login-action@v3
-#         with:
-#           username: ${{ secrets.DOCKER_USERNAME }}
-#           password: ${{ secrets.DOCKER_PASSWORD }}
-
-#       - name: Build and Push Docker Image
-#         uses: docker/build-push-action@v5
-#         with:
-#           context: .
-#           push: true
-#           tags: moshindevops11/todo-app:latest
-
-
-
-
-name: Vite To-Do CI/CD
+name: Vite To-Do CI/CD Optimized
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 env:
   DOCKER_IMAGE: moshindevops11/todo-app
-  DOCKER_TAG: latest
 
 jobs:
   build-test:
     name: Build & Test
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm test
-        continue-on-error: false
-
-      - name: Build project
-        run: npm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test 
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist
 
   docker-deploy:
-    name: Build & Deploy Docker
+    name: Build & Deploy
     needs: build-test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build Docker Image
-        id: docker_build
+      - name: Tag current as previous
         run: |
-          docker build -t $DOCKER_IMAGE:$DOCKER_TAG .
-        continue-on-error: false
+          docker pull $DOCKER_IMAGE:latest || true
+          docker tag $DOCKER_IMAGE:latest $DOCKER_IMAGE:previous || true
+          docker push $DOCKER_IMAGE:previous || true
 
-      - name: Push Docker Image (with retries)
-        run: |
-          for i in {1..3}; do
-            docker push $DOCKER_IMAGE:$DOCKER_TAG && break
-            echo "Retry $i failed. Retrying in 10s..."
-            sleep 10
-          done
-        continue-on-error: false
-
-      - name: Deploy Docker Container (rollback on failure)
-        run: |
-          set -e
-          echo "Stopping existing container if exists..."
-          docker ps -q --filter "name=todo-vite" | xargs -r docker stop
-          docker ps -a -q --filter "name=todo-vite" | xargs -r docker rm
-
-          echo "Running new container..."
-          if ! docker run -d --name todo-vite -p 80:80 $DOCKER_IMAGE:$DOCKER_TAG; then
-            echo "Deployment failed. Rolling back..."
-            # Attempt rollback using previous image tag
-            docker run -d --name todo-vite -p 80:80 $DOCKER_IMAGE:previous || echo "Rollback also failed!"
-            exit 1
-          fi
+     
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
