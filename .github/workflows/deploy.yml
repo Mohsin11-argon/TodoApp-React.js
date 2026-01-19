@@ -1,4 +1,4 @@
-name: Vite To-Do CI/CD Optimized
+name: Vite To-Do CI/CD (Enterprise Optimized)
 
 on:
   push:
@@ -14,17 +14,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
+
       - run: npm ci
-      - run: npm test 
-      - run: npm run build
-      - uses: actions/upload-artifact@v4
+
+      - name: Run Tests
+        run: npm test #
+
+      - name: Build Project
+        run: npm run build #
+
+      - name: Verify Build
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "ERROR: dist folder missing!"
+            exit 1
+          fi #
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist
+          name: build-assets
+          path: |
+            dist
+            Dockerfile
+            package.json #
 
   docker-deploy:
     name: Build & Deploy
@@ -32,19 +51,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-assets #
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          password: ${{ secrets.DOCKER_PASSWORD }} #
 
-      - name: Tag current as previous
-        run: |
-          docker pull $DOCKER_IMAGE:latest || true
-          docker tag $DOCKER_IMAGE:latest $DOCKER_IMAGE:previous || true
-          docker push $DOCKER_IMAGE:previous || true
+      - name: Get Short SHA
+        id: vars
+        run: echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-     
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
@@ -52,4 +74,5 @@ jobs:
           push: true
           tags: |
             ${{ env.DOCKER_IMAGE }}:latest
-            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+            ${{ env.DOCKER_IMAGE }}:${{ steps.vars.outputs.short_sha }}
+            ${{ env.DOCKER_IMAGE }}:v1.0.${{ github.run_number }}
