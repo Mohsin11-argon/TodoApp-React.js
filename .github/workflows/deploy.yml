@@ -2,7 +2,9 @@ name: Vite To-Do CI/CD (Enterprise Optimized)
 
 on:
   push:
-    branches: [ main ]
+    branches: 
+      - main
+      - feature/test-pipeline  
   workflow_dispatch:
 
 env:
