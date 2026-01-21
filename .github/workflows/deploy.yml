@@ -7,8 +7,6 @@ on:
 
 env:
   DOCKER_IMAGE: moshindevops11/todo-app
-  
-  VITE_APP_STATUS: ${{ secrets.VITE_APP_STATUS }}
 
 jobs:
   build-test:
@@ -16,21 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-
       - run: npm ci
-
       - name: Build Project
-        # Yahan build ke waqt env variable pass ho raha hai
         run: npm run build
-        env:
-          VITE_APP_STATUS: ${{ env.VITE_APP_STATUS }}
-
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -40,24 +31,7 @@ jobs:
             Dockerfile
             package.json
 
-  # --- GITHUB PAGES DEPLOYMENT JOB ---
-  deploy-pages:
-    name: Deploy to GitHub Pages
-    needs: build-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-assets
-          path: dist
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-
+  # --- DOCKER JOB (Existing) ---
   docker-build-push:
     name: Build & Push to Docker Hub
     needs: build-test
@@ -80,9 +54,32 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:latest
 
-  deploy-ssh:
-    name: Deploy to Server via SSH
-    needs: docker-build-push
+  # --- STAGING JOB (New - Pages) ---
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-test
+    environment: Staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-assets
+          path: dist
+
+      - name: Deploy to GitHub Pages (Staging)
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+        env:
+          VITE_APP_STATUS: ${{ secrets.VITE_APP_STATUS }}
+
+  # --- PRODUCTION JOB (New - SSH) ---
+  deploy-production:
+    name: Deploy to Production
+    needs: [docker-build-push, deploy-staging]
+    environment: Production
     runs-on: ubuntu-latest
     steps:
       - name: Executing remote SSH commands
@@ -95,4 +92,6 @@ jobs:
             docker pull ${{ env.DOCKER_IMAGE }}:latest
             docker stop todo-app || true
             docker rm todo-app || true
-            docker run -d --name todo-app -p 80:80 ${{ env.DOCKER_IMAGE }}:latest
+            docker run -d --name todo-app -p 80:80 \
+            -e VITE_APP_STATUS="${{ secrets.VITE_APP_STATUS }}" \
+            ${{ env.DOCKER_IMAGE }}:latest
