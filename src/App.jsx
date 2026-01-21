@@ -12,7 +12,7 @@ function App() {
   useEffect(() => {
     localStorage.setItem('todos', JSON.stringify(tasks));
   }, [tasks]);
-
+  
   const addTask = (e) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -45,6 +45,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+
+      <h1>Project Status: {import.meta.env.VITE_APP_STATUS}</h1>
+      
       <div className="bg-white w-full max-w-md rounded-[2rem] shadow-xl p-8">
         <h1 className="text-3xl font-black text-indigo-600 text-center mb-8">Task Master Pro</h1>
 
