@@ -1,4 +1,4 @@
-name: Vite To-Do CI/CD (Enterprise Optimized)
+name: Vite To-Do CI/CD (GitHub Pages Optimized)
 
 on:
   push:
@@ -26,12 +26,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-assets
-          path: |
-            dist
-            Dockerfile
-            package.json
+          path: dist/
 
-  # --- DOCKER JOB (Existing) ---
+  # --- DOCKER JOB ---
   docker-build-push:
     name: Build & Push to Docker Hub
     needs: build-test
@@ -54,9 +51,9 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:latest
 
-  # --- STAGING JOB (New - Pages) ---
+  # --- STAGING JOB (Active) ---
   deploy-staging:
-    name: Deploy to Staging
+    name: Deploy to Staging (GitHub Pages)
     needs: build-test
     environment: Staging
     runs-on: ubuntu-latest
@@ -67,7 +64,7 @@ jobs:
           name: build-assets
           path: dist
 
-      - name: Deploy to GitHub Pages (Staging)
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -75,23 +72,23 @@ jobs:
         env:
           VITE_APP_STATUS: ${{ secrets.VITE_APP_STATUS }}
 
-  # --- PRODUCTION JOB (New - SSH) ---
-  deploy-production:
-    name: Deploy to Production
-    needs: [docker-build-push, deploy-staging]
-    environment: Production
-    runs-on: ubuntu-latest
-    steps:
-      - name: Executing remote SSH commands
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            docker pull ${{ env.DOCKER_IMAGE }}:latest
-            docker stop todo-app || true
-            docker rm todo-app || true
-            docker run -d --name todo-app -p 80:80 \
-            -e VITE_APP_STATUS="${{ secrets.VITE_APP_STATUS }}" \
-            ${{ env.DOCKER_IMAGE }}:latest
+  # --- PRODUCTION JOB (Commented Out for Future Use) ---
+  # deploy-production:
+  #   name: Deploy to Production
+  #   needs: [docker-build-push, deploy-staging]
+  #   environment: Production
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Executing remote SSH commands
+  #       uses: appleboy/ssh-action@v1.0.3
+  #       with:
+  #         host: ${{ secrets.SERVER_IP }}
+  #         username: ${{ secrets.SERVER_USER }}
+  #         key: ${{ secrets.SERVER_SSH_KEY }}
+  #         script: |
+  #           docker pull ${{ env.DOCKER_IMAGE }}:latest
+  #           docker stop todo-app || true
+  #           docker rm todo-app || true
+  #           docker run -d --name todo-app -p 80:80 \
+  #           -e VITE_APP_STATUS="${{ secrets.VITE_APP_STATUS }}" \
+  #           ${{ env.DOCKER_IMAGE }}:latest
